@@ -5,7 +5,7 @@ Authentification is needed.
 ## Nginx
 http://neurolibre-data.conp.cloud
 
-[Nginx](https://www.nginx.com/) is used to give access to the neurolibre books (both for downloading, and preview content) and the neurolibre databases collected with [Repo2Data](https://github.com/SIMEXP/Repo2Data)
+[Nginx](https://www.nginx.com/) gives access to the server cached [neurolibre books](https://github.com/neurolibre/neurolibre-books) (both for downloading, and previewing content) and the neurolibre databases collected with [Repo2Data](https://github.com/SIMEXP/Repo2Data)
 
 ## Python API endpoint
 http://neurolibre-data.conp.cloud:8081/
