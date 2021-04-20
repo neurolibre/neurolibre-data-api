@@ -107,6 +107,7 @@ def api_books_post(user):
     binderhub_request = binderhub_api_url.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
     req = requests.get(binderhub_request)
     commit_hash = None
+    os.remove(lock_filepath)
     for item in req.content.decode("utf8").split("data: "):
         # create dict if string has repo_url
         print(item)
@@ -116,13 +117,10 @@ def api_books_post(user):
             if dict_log["phase"] == "ready":
                 commit_hash = dict_log["binder_ref_url"].split("/")[-1]
             else:
-                os.remove(lock_filepath)
                 flask.abort(500, "environment not ready!")
     if commit_hash == None:
-        os.remove(lock_filepath)
         flask.abort(500, "commit hash not found from built environment!")
     results = book_get_by_params(commit_hash=commit_hash)
-    os.remove(lock_filepath)
     if not results:
         flask.abort(424)
 
