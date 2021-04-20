@@ -96,33 +96,34 @@ def api_books_post(user):
     else:
         commit = "HEAD"
     
+    binderhub_request = binderhub_api_url.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
     lock_filepath = f"./{provider}_{user_repo}_{repo}.lock"
     if os.path.exists(lock_filepath):
-        flask.abort(409)
+        binderhub_build_link = """
+https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
+""".format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
+        flask.abort(409, binderhub_build_link)
     else:
         with open(lock_filepath, "w") as f:
             f.write("")
 
     # requests build
-    binderhub_request = binderhub_api_url.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
     req = requests.get(binderhub_request)
     commit_hash = None
     os.remove(lock_filepath)
     for item in req.content.decode("utf8").split("data: "):
         # create dict if string has repo_url
-        print(item)
-        if "repo_url" in item.strip():
+		print(item)
+        if "server running at" in item:
             dict_log = json.loads(item.strip())
             # get commit hash just if log says that it was ready
             if dict_log["phase"] == "ready":
                 commit_hash = dict_log["binder_ref_url"].split("/")[-1]
             else:
                 flask.abort(500, "environment not ready!")
-    if commit_hash == None:
-        flask.abort(500, "commit hash not found from built environment!")
     results = book_get_by_params(commit_hash=commit_hash)
     if not results:
-        flask.abort(424)
+        flask.abort(424, "Jupyter book built was not successfull!")
 
     return flask.jsonify(results)
 
@@ -200,14 +201,15 @@ def page_not_found(e):
 def page_not_found(e):
     return """
 <h1>409</h1>
-<p>A similar request has been already sent!</p>
+<p>A similar request has been already sent</p>
+<p>{}</p>
 <p> Please be patient...</p>
 <img src=\"https://media.giphy.com/media/3o7TKxBr7xhEgJhaFy/giphy.gif\">
-""", 409
+""".format(str(e)), 409
 
 @app.errorhandler(424)
 def page_not_found(e):
-    return "<h1>424</h1><p>The request failed due to failure of the jupyter book build request.</p>", 424
+    return "<h1>424</h1><p>The request failed due to a previous request.</p><p>{}</p>".format(str(e)), 424
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8081)
