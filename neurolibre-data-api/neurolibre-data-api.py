@@ -121,6 +121,9 @@ def api_books_post(user):
         flask.abort(500, "commit hash not found from built environment!")
     results = book_get_by_params(commit_hash=commit_hash)
     os.remove(lock_filepath)
+    
+    if not results:
+        flask.abort(424)
 
     return flask.jsonify(results)
 
@@ -202,6 +205,10 @@ def page_not_found(e):
 <p> Please be patient...</p>
 <img src=\"https://media.giphy.com/media/3o7TKxBr7xhEgJhaFy/giphy.gif\">
 """, 409
+
+@app.errorhandler(424)
+def page_not_found(e):
+    return "<h1>424</h1><p>The request failed due to failure of the jupyter book build request.</p>", 424
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8081)
