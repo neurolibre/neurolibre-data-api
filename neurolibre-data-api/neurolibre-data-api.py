@@ -122,24 +122,21 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
         with open(lock_filepath, "w") as f:
             f.write("")
     # requests builds
-    req = requests.get(binderhub_request)
-    results = book_get_by_params(commit_hash=commit_hash)
-    os.remove(lock_filepath)
-    if not results:
-        flask.abort(424, "Jupyter book built was not successfull!")
+    req = requests.get(binderhub_request, stream=True)
+    def run():
+        for line in req.iter_lines():
+            if line:
+                yield str(line.decode('utf-8')) + "\n"
+        results = book_get_by_params(commit_hash=commit_hash)
+        os.remove(lock_filepath)
+        print(results)
+        if not results:
+            yield ("424: Jupyter book built was not successfull!")
+        else:
+            yield "\n" + json.dumps(results[0])
+            yield ""
 
-    return flask.jsonify(results)
-
-    #def run():
-    #    binderhub_request = binderhub_api_url.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
-    #    
-    #    yield f"Hello {user}, you are requesting:\n{binderhub_request}\n"
-    #    proc =  subprocess.Popen(["curl", binderhub_request], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    #    for line in iter(process.stdout.read(), b''):
-    #        #sys.stdout.write(line)
-    #        yield line
-    
-    #return flask.Response(run(), mimetype='text/plain')
+    return flask.Response(flask.stream_with_context(run()), mimetype='text/plain')
 
 @app.route('/api/v1/resources/books', methods=['GET'])
 @htpasswd.required
