@@ -5,6 +5,7 @@ import glob
 import time
 import subprocess
 import requests
+import git
 from flask_htpasswd import HtPasswdAuth
 
 # https://stackoverflow.com/questions/41410199/how-to-configure-nginx-to-pass-user-info-to-wsgi-flask
@@ -96,6 +97,20 @@ def api_books_post(user):
     else:
         commit = "HEAD"
     
+    # checking user commit hash
+    commit_found  = False
+    if commit == "HEAD":
+        refs = git.cmd.Git().ls_remote(repo_url).split("\n")
+        for ref in refs:
+            if ref.split('\t')[1] == "HEAD":
+                commit_hash = ref.split('\t')[0]
+                commit_found = True
+    else:
+        commit_hash = commit
+    #if not commit_found:
+    #    flask.abort(406, "Bad commit {}!".format(commit))
+
+    # make binderhub and jupyter book builds
     binderhub_request = binderhub_api_url.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
     lock_filepath = f"./{provider}_{user_repo}_{repo}.lock"
     if os.path.exists(lock_filepath):
@@ -106,22 +121,10 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
     else:
         with open(lock_filepath, "w") as f:
             f.write("")
-
-    # requests build
+    # requests builds
     req = requests.get(binderhub_request)
-    commit_hash = None
-    os.remove(lock_filepath)
-    for item in req.content.decode("utf8").split("data: "):
-        # create dict if string has repo_url
-        print(item)
-        if "server running at" in item:
-            dict_log = json.loads(item.strip())
-            # get commit hash just if log says that it was ready
-            if dict_log["phase"] == "ready":
-                commit_hash = dict_log["binder_ref_url"].split("/")[-1]
-            else:
-                flask.abort(500, "environment not ready!")
     results = book_get_by_params(commit_hash=commit_hash)
+    os.remove(lock_filepath)
     if not results:
         flask.abort(424, "Jupyter book built was not successfull!")
 
@@ -196,6 +199,10 @@ def bad_request(e):
 @app.errorhandler(404)
 def page_not_found(e):
     return "<h1>404</h1><p>The resource could not be found.</p>", 404
+
+@app.errorhandler(406)
+def page_not_found(e):
+    return "<h1>406</h1><p>Given specifications does not conform any content.</p><p>{}</p>".format(str(e)), 406
 
 @app.errorhandler(409)
 def page_not_found(e):
