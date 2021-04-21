@@ -131,7 +131,8 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
         os.remove(lock_filepath)
         print(results)
         if not results:
-            yield ("424: Jupyter book built was not successfull!")
+            yield ("\n424: Jupyter book built was not successfull!")
+            yield ""
         else:
             yield "\n" + json.dumps(results[0])
             yield ""
