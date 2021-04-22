@@ -131,7 +131,8 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
         os.remove(lock_filepath)
         print(results)
         if not results:
-            yield ("\n424: Jupyter book built was not successfull!")
+            error = {"reason":"424: Jupyter book built was not successfull!", "commit_hash":commit_hash, "binderhub_url":binderhub_request}
+            yield "\n" + json.dumps(error)
             yield ""
         else:
             yield "\n" + json.dumps(results[0])
@@ -187,7 +188,7 @@ def book_get_by_params(user_name=None, commit_hash=None, repo_name=None):
     return results
 
 @app.errorhandler(500)
-def bad_request(e):
+def internal_error(e):
     return "<h1>500</h1><p>Internal server error</p>{}".format(str(e)), 500
 
 @app.errorhandler(400)
@@ -199,21 +200,16 @@ def page_not_found(e):
     return "<h1>404</h1><p>The resource could not be found.</p>", 404
 
 @app.errorhandler(406)
-def page_not_found(e):
+def malformed_specs(e):
     return "<h1>406</h1><p>Given specifications does not conform any content.</p><p>{}</p>".format(str(e)), 406
 
 @app.errorhandler(409)
-def page_not_found(e):
-    return """
-<h1>409</h1>
-<p>A similar request has been already sent</p>
-<p>{}</p>
-<p> Please be patient...</p>
-<img src=\"https://media.giphy.com/media/3o7TKxBr7xhEgJhaFy/giphy.gif\">
-""".format(str(e)), 409
+def same_request(e):
+    error = {"reason":"A similar request has been already sent!", "binderhub_url":str(e)}
+    return json.dumps(error), 409
 
 @app.errorhandler(424)
-def page_not_found(e):
+def previous_request_failed(e):
     return "<h1>424</h1><p>The request failed due to a previous request.</p><p>{}</p>".format(str(e)), 424
 
 if __name__ == '__main__':
