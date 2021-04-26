@@ -123,12 +123,12 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
             f.write("")
     # requests builds
     req = requests.get(binderhub_request, stream=True)
+    os.remove(lock_filepath)
     def run():
         for line in req.iter_lines():
             if line:
                 yield str(line.decode('utf-8')) + "\n"
         results = book_get_by_params(commit_hash=commit_hash)
-        os.remove(lock_filepath)
         print(results)
         if not results:
             error = {"reason":"424: Jupyter book built was not successfull!", "commit_hash":commit_hash, "binderhub_url":binderhub_request}
