@@ -113,6 +113,8 @@ def api_books_post(user):
     # make binderhub and jupyter book builds
     binderhub_request = binderhub_api_url.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
     lock_filepath = f"./{provider}_{user_repo}_{repo}.lock"
+    # check lock age, if too old, bypass lock ?
+    # time.time() - os.path.getmtime(path)
     if os.path.exists(lock_filepath):
         binderhub_build_link = """
 https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
@@ -123,13 +125,13 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
             f.write("")
     # requests builds
     req = requests.get(binderhub_request, stream=True)
-    os.remove(lock_filepath)
     def run():
         for line in req.iter_lines():
             if line:
                 yield str(line.decode('utf-8')) + "\n"
         results = book_get_by_params(commit_hash=commit_hash)
         print(results)
+        os.remove(lock_filepath)
         if not results:
             error = {"reason":"424: Jupyter book built was not successfull!", "commit_hash":commit_hash, "binderhub_url":binderhub_request}
             yield "\n" + json.dumps(error)
