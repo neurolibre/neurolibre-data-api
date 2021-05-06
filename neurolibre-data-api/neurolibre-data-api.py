@@ -32,7 +32,7 @@ def load_all(globpath=BOOK_PATHS):
         repo = path_list[-2]
         provider = path_list[-3]
         user = path_list[-4]
-        book_dict = {"book_url": BOOK_URL + f"/{user}/{provider}/{repo}/{commit_hash}/html/"
+        book_dict = {"book_url": BOOK_URL + f"/{user}/{provider}/{repo}/{commit_hash}/_build/html/"
                      , "download_link": BOOK_URL + path.replace("/DATA/book-artifacts", "")
                      , "repo_link": f"https://{provider}/{user}/{repo}"
                      , "user_name": user
