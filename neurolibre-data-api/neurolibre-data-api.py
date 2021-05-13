@@ -107,13 +107,11 @@ def api_books_post(user):
                 commit_found = True
     else:
         commit_hash = commit
-    #if not commit_found:
-    #    flask.abort(406, "Bad commit {}!".format(commit))
 
     # make binderhub and jupyter book builds
     binderhub_request = binderhub_api_url.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
     lock_filepath = f"./{provider}_{user_repo}_{repo}.lock"
-    # check lock age, if too old, bypass lock ?
+    #TODO check lock age, if too old, bypass lock ?
     # time.time() - os.path.getmtime(path)
     if os.path.exists(lock_filepath):
         binderhub_build_link = """
@@ -124,7 +122,7 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
         with open(lock_filepath, "w") as f:
             f.write("")
     # requests builds
-    req = requests.get(binderhub_request, stream=True)
+    req = requests.get(binderhub_request)
     def run():
         for line in req.iter_lines():
             if line:
@@ -140,7 +138,25 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
             yield "\n" + json.dumps(results[0])
             yield ""
 
-    return flask.Response(flask.stream_with_context(run()), mimetype='text/plain')
+    return flask.Response(run(), mimetype='text/plain')
+
+    # req = requests.get(binderhub_request, stream=True)
+    # def run():
+    #     for line in req.iter_lines():
+    #         if line:
+    #             yield str(line.decode('utf-8')) + "\n"
+    #     results = book_get_by_params(commit_hash=commit_hash)
+    #     print(results)
+    #     os.remove(lock_filepath)
+    #     if not results:
+    #         error = {"reason":"424: Jupyter book built was not successfull!", "commit_hash":commit_hash, "binderhub_url":binderhub_request}
+    #         yield "\n" + json.dumps(error)
+    #         yield ""
+    #     else:
+    #         yield "\n" + json.dumps(results[0])
+    #         yield ""
+
+    # return flask.Response(flask.stream_with_context(run()), mimetype='text/plain')
 
 @app.route('/api/v1/resources/books', methods=['GET'])
 @htpasswd.required
