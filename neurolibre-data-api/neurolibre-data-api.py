@@ -111,8 +111,11 @@ def api_books_post(user):
     # make binderhub and jupyter book builds
     binderhub_request = binderhub_api_url.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
     lock_filepath = f"./{provider}_{user_repo}_{repo}.lock"
-    #TODO check lock age, if too old, bypass lock ?
-    # time.time() - os.path.getmtime(path)
+    if os.path.exists(lock_filepath):
+        lock_age_in_secs = time.time() - os.path.getmtime(lock_filepath)
+        # if lock file older than 30min, remove it
+        if lock_age_in_secs > 1800:
+            os.remove(lock_filepath)
     if os.path.exists(lock_filepath):
         binderhub_build_link = """
 https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
