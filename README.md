@@ -17,6 +17,10 @@ neurolibre-data.config -> /etc/nginx/conf.d/default.conf
 http://neurolibre-data.conp.cloud:8081/
 ### python-flask
 The python library [Flask](https://flask.palletsprojects.com/en/1.1.x/) is used to create the REST JSON API.
+
+Flask (1.1.2)
+flask-htpasswd (0.4.0)
+GitPython (3.1.20)
 ### systemctl
 Spawn the python-flask deamon process as a systemd service.
 ```
