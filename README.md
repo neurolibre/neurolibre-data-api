@@ -4,8 +4,10 @@ Authentification is needed.
 
 ## Nginx - 1.20.1-1~xenial
 http://neurolibre-data.conp.cloud
-ve
+
 [Nginx](https://www.nginx.com/) gives access to the server cached [neurolibre books](https://github.com/neurolibre/neurolibre-books) (both for downloading, and previewing content) and the neurolibre databases collected with [Repo2Data](https://github.com/SIMEXP/Repo2Data)
+
+https://www.nginx.com/resources/wiki/start/topics/tutorials/install/#official-debian-ubuntu-packages
 
 ```
 neurolibre-data.config -> /etc/nginx/conf.d/default.conf
