@@ -55,6 +55,8 @@ def load_all(globpath=BOOK_PATHS):
 
 def doc():
     return """
+<p> Commad line: </p>
+<p> &nbsp; curl -u user:pwd </p>
 <p> Build book from a specific repository (\"commit\" defaults to HEAD) </p>
 <p> &nbsp; POST &nbsp; &nbsp; -H "Content-Type: application/json" -d '{"repo_url":"https://github.com/ltetrel/nha2020-nilearn", "commit_hash":"e29aa259f6807e62610bc84a86d406065028fe29"}' /api/v1/resources/books</p>
 <p> List all books </p>
