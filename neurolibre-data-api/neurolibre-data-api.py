@@ -33,16 +33,15 @@ def load_all(globpath=BOOK_PATHS):
         repo = path_list[-2]
         provider = path_list[-3]
         user = path_list[-4]
-        nb_list = []
-        for (dirpath, dirnames, filenames) in os.walk(curr_dir + "/_build/jupyter_execute"):
+        build_list = []
+        for (dirpath, dirnames, filenames) in os.walk(curr_dir + "/_build/html"):
             for input_file in filenames:
-                if input_file.split(".")[-1] == "ipynb":
-                    nb_list += [os.path.join(dirpath, input_file).replace("/DATA/book-artifacts", BOOK_URL)]
-        nb_list = sorted(nb_list)
+                build_list += [os.path.join(dirpath, input_file).replace("/DATA/book-artifacts", BOOK_URL)]
+        build_list = sorted(build_list)
         book_dict = {"book_url": BOOK_URL + f"/{user}/{provider}/{repo}/{commit_hash}/_build/html/"
                      , "book_build_logs": BOOK_URL + f"/{user}/{provider}/{repo}/{commit_hash}/book-build.log"
                      , "download_link": BOOK_URL + path.replace("/DATA/book-artifacts", "")
-                     , "notebook_list": nb_list
+                     , "build_files": build_list
                      , "repo_link": f"https://{provider}/{user}/{repo}"
                      , "user_name": user
                      , "repo_name": repo
