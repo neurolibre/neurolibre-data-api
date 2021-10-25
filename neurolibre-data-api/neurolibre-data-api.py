@@ -236,7 +236,7 @@ def malformed_specs(e):
 
 @app.errorhandler(409)
 def same_request(e):
-    error = {"reason":"A similar request has been already sent!", "binderhub_url":str(e)}
+    error = {"reason":"A similar request has been already sent! We allow one request every 30 min.", "binderhub_url":str(e)}
     return json.dumps(error), 409
 
 @app.errorhandler(424)
