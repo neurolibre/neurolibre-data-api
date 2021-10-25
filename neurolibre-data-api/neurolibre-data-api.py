@@ -130,7 +130,7 @@ def api_books_post(user):
         binderhub_build_link = """
 https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
 """.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
-        flask.abort(409, binderhub_build_link)
+        flask.abort(429, lock_age_in_secs, binderhub_build_link)
     else:
         with open(lock_filepath, "w") as f:
             f.write("")
@@ -234,10 +234,10 @@ def page_not_found(e):
 def malformed_specs(e):
     return "<h1>406</h1><p>Given specifications does not conform any content.</p><p>{}</p>".format(str(e)), 406
 
-@app.errorhandler(409)
-def same_request(e):
-    error = {"reason":"A similar request has been already sent! We allow one request every 30 min.", "binderhub_url":str(e)}
-    return json.dumps(error), 409
+@app.errorhandler(429)
+def same_request(t, e):
+    error = {"reason":"A similar request has been already sent! Try again after {}s.".format(t), "binderhub_url":str(e)}
+    return json.dumps(error), 429
 
 @app.errorhandler(424)
 def previous_request_failed(e):
