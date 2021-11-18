@@ -120,21 +120,30 @@ def api_deposit_post(user):
     # Create a zip archive for the requested html 
     shutil.make_archive(zenodo_file, 'zip', local_path)
     # Create a new deposit
-    headers = {"Content-Type": "application/json"}
-    params = {'access_token': os.environ('ZENODO_API')}
-    r = requests.post('https://sandbox.zenodo.org/api/deposit/depositions',
-                   params=params,
-                   json={},
-                   headers=headers)
-    bucket_url = r.json()["links"]["bucket"]
-    zpath = "/DATA/zenodo"
-    with open(zpath, "rb") as fp:
-        r = requests.put(
-            "%s/%s" % (bucket_url, "book" + commit_hash + ".zip"),
-            data=fp,
-            params=params,
-        )
-    return flask.Response(r.json(), mimetype='text/plain')
+    def run():
+        headers = {"Content-Type": "application/json"}
+        params = {'access_token': os.environ('ZENODO_API')}
+        r = requests.post('https://sandbox.zenodo.org/api/deposit/depositions',
+                    params=params,
+                    json={},
+                    headers=headers)
+        bucket_url = r.json()["links"]["bucket"]
+        zpath = "/DATA/zenodo"
+        with open(zpath, "rb") as fp:
+            r = requests.put(
+                "%s/%s" % (bucket_url, "book" + commit_hash + ".zip"),
+                data=fp,
+                params=params)
+        print(r.json())
+        if not r:
+            error = {"reason":"404: Something went wrong", "commit_hash":commit_hash, "repo_url":repo_url}
+            yield "\n" + json.dumps(error)
+            yield ""
+        else:
+            yield "\n" + json.dumps(r.json())
+            yield ""
+
+    return flask.Response(run(), mimetype='text/plain')
 
 
 @app.route('/api/v1/resources/books/sync', methods=['POST'])
