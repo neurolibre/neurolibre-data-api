@@ -54,7 +54,6 @@ def load_all(globpath=BOOK_PATHS):
     return book_collection
 
 def doc():
-    aa = os.getenv("AGAH")
     return """
 <p> Commad line: </p>
 <p> &nbsp; curl -u user:pwd </p>
@@ -70,7 +69,7 @@ def doc():
 <p> &nbsp; GET &nbsp; &nbsp; /api/v1/resources/books?commit_hash=737586b68c03b5fae1ee2a07b78ecb8b12ca2751 </p>
 <p> Retrieve book(s) by repository name </p>
 <p> &nbsp; GET &nbsp; &nbsp; /api/v1/resources/books?repo_name=hello-world </p>
-""" + aa
+"""
 
 @app.route('/', methods=['GET'])
 @htpasswd.required
