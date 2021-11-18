@@ -116,22 +116,23 @@ def api_deposit_post(user):
     else:
         commit_hash = commit
     local_path = os.path.join("/DATA", "book-artifacts", user_repo, provider, repo, commit_hash, "_build", "html")
-    zenodo_file = os.path.join("/DATA","zenodo","book" + commit_hash)
+    zenodo_file = os.path.join("/DATA","zenodo","book_" + commit_hash)
     # Create a zip archive for the requested html 
     shutil.make_archive(zenodo_file, 'zip', local_path)
     # Create a new deposit
     def run():
+        ZENODO_TOKEN = os.environ('ZENODO_API')
         headers = {"Content-Type": "application/json"}
-        params = {'access_token': os.environ('ZENODO_API')}
-        r = requests.post('https://sandbox.zenodo.org/api/deposit/depositions',
+        params = {'access_token': ZENODO_TOKEN}
+        r = requests.post('https://zenodo.org/api/deposit/depositions',
                     params=params,
                     json={},
                     headers=headers)
         bucket_url = r.json()["links"]["bucket"]
-        zpath = "/DATA/zenodo"
+        zpath = zenodo_file + ".zip"
         with open(zpath, "rb") as fp:
             r = requests.put(
-                "%s/%s" % (bucket_url, "book" + commit_hash + ".zip"),
+                "%s/%s" % (bucket_url, "book_" + commit_hash + ".zip"),
                 data=fp,
                 params=params)
         print(r.json())
