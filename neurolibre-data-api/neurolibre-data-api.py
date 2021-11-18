@@ -13,7 +13,7 @@ from flask_htpasswd import HtPasswdAuth
 
 # GLOBAL VARIABLES
 BOOK_PATHS = "/DATA/book-artifacts/*/*/*/*.tar.gz"
-BOOK_URL = "http://neurolibre-data.conp.cloud/book-artifacts"
+BOOK_URL = "http://neurolibre-data-prod.conp.cloud/book-artifacts"
 
 #https://programminghistorian.org/en/lessons/creating-apis-with-python-and-flask
 
@@ -55,8 +55,12 @@ def load_all(globpath=BOOK_PATHS):
 
 def doc():
     return """
-<p> Build book from a specific repository (\"commit\" defaults to HEAD) </p>
-<p> &nbsp; POST &nbsp; &nbsp; -H "Content-Type: application/json" -d '{"repo_url":"https://github.com/ltetrel/nha2020-nilearn", "commit_hash":"e29aa259f6807e62610bc84a86d406065028fe29"}' /api/v1/resources/books</p>
+<p> Commad line: </p>
+<p> &nbsp; curl -u user:pwd </p>
+<p> Synchronize jupyter book build from test server (\"commit_hash\" defaults to HEAD): </p>
+<p> &nbsp; POST &nbsp; &nbsp; -H "Content-Type: application/json" -d '{"repo_url":"https://github.com/ltetrel/nha2020-nilearn", "commit_hash":"e29aa259f6807e62610bc84a86d406065028fe29"}' /api/v1/resources/books/sync </p>
+<p> Binder build a specific repository (\"commit_hash\" defaults to HEAD): </p>
+<p> &nbsp; POST &nbsp; &nbsp; -H "Content-Type: application/json" -d '{"repo_url":"https://github.com/ltetrel/nha2020-nilearn", "commit_hash":"e29aa259f6807e62610bc84a86d406065028fe29"}' /api/v1/resources/binder/build</p>
 <p> List all books </p>
 <p> &nbsp; GET &nbsp; &nbsp; /api/v1/resources/books/all </p>
 <p> Retrieve book(s) by username </p>
@@ -83,11 +87,62 @@ def api_all(user):
     
     return flask.jsonify(books)
 
-@app.route('/api/v1/resources/books', methods=['POST'])
+@app.route('/api/v1/resources/books/sync', methods=['POST'])
 @htpasswd.required
-def api_books_post(user):
+def api_sync_post(user):
+    user_request = flask.request.get_json(force=True)
+
+    if "repo_url" in user_request:
+        repo_url = user_request["repo_url"]
+        repo = repo_url.split("/")[-1]
+        user_repo = repo_url.split("/")[-2]
+        provider = repo_url.split("/")[-3]
+        if not ((provider == "github.com") | (provider == "gitlab.com")):
+            flask.abort(400)
+    else:
+        flask.abort(400)
+    if "commit_hash" in user_request:
+        commit = user_request["commit_hash"]
+    else:
+        commit = "HEAD"
+    # checking user commit hash
+    commit_found  = False
+    if commit == "HEAD":
+        refs = git.cmd.Git().ls_remote(repo_url).split("\n")
+        for ref in refs:
+            if ref.split('\t')[1] == "HEAD":
+                commit_hash = ref.split('\t')[0]
+                commit_found = True
+    else:
+        commit_hash = commit
+
+    # transfer with rsync
+    remote_path = os.path.join("neurolibre-data-test:", "DATA", "book-artifacts", user_repo, provider, repo, commit_hash + "*")
+    try:
+        subprocess.check_call(["rsync", "-avR", remote_path, "/"])
+    except subprocess.CalledProcessError:
+        flask.abort(404)
+
+    # final check
+    def run():
+        results = book_get_by_params(commit_hash=commit_hash)
+        print(results)
+        if not results:
+            error = {"reason":"404: Could not found the jupyter book build!", "commit_hash":commit_hash, "repo_url":repo_url}
+            yield "\n" + json.dumps(error)
+            yield ""
+        else:
+            yield "\n" + json.dumps(results[0])
+            yield ""
+
+    return flask.Response(run(), mimetype='text/plain')
+
+
+@app.route('/api/v1/resources/binder/build', methods=['POST'])
+@htpasswd.required
+def api_build_post(user):
     user_request = flask.request.get_json(force=True) 
-    binderhub_api_url = "https://binder.conp.cloud/build/{provider}/{user_repo}/{repo}.git/{commit}"
+    binderhub_api_url = "https://binder-mcgill.conp.cloud/build/{provider}/{user_repo}/{repo}.git/{commit}"
 
     if "repo_url" in user_request:
         repo_url = user_request["repo_url"]
@@ -127,7 +182,7 @@ def api_books_post(user):
             os.remove(lock_filepath)
     if os.path.exists(lock_filepath):
         binderhub_build_link = """
-https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
+https://binder-mcgill.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
 """.format(provider=provider, user_repo=user_repo, repo=repo, commit=commit)
         flask.abort(409, binderhub_build_link)
     else:
@@ -139,36 +194,9 @@ https://binder.conp.cloud/v2/{provider}/{user_repo}/{repo}/{commit}
         for line in req.iter_lines():
             if line:
                 yield str(line.decode('utf-8')) + "\n"
-        results = book_get_by_params(commit_hash=commit_hash)
-        print(results)
-        os.remove(lock_filepath)
-        if not results:
-            error = {"reason":"424: Jupyter book built was not successfull!", "commit_hash":commit_hash, "binderhub_url":binderhub_request}
-            yield "\n" + json.dumps(error)
-            yield ""
-        else:
-            yield "\n" + json.dumps(results[0])
-            yield ""
+        yield ""
 
     return flask.Response(run(), mimetype='text/plain')
-
-    # req = requests.get(binderhub_request, stream=True)
-    # def run():
-    #     for line in req.iter_lines():
-    #         if line:
-    #             yield str(line.decode('utf-8')) + "\n"
-    #     results = book_get_by_params(commit_hash=commit_hash)
-    #     print(results)
-    #     os.remove(lock_filepath)
-    #     if not results:
-    #         error = {"reason":"424: Jupyter book built was not successfull!", "commit_hash":commit_hash, "binderhub_url":binderhub_request}
-    #         yield "\n" + json.dumps(error)
-    #         yield ""
-    #     else:
-    #         yield "\n" + json.dumps(results[0])
-    #         yield ""
-
-    # return flask.Response(flask.stream_with_context(run()), mimetype='text/plain')
 
 @app.route('/api/v1/resources/books', methods=['GET'])
 @htpasswd.required
@@ -243,5 +271,5 @@ def previous_request_failed(e):
     return "<h1>424</h1><p>The request failed due to a previous request.</p><p>{}</p>".format(str(e)), 424
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=8081)
+    app.run(host="0.0.0.0", port=29876)
 
