@@ -5,6 +5,7 @@ import glob
 import time
 import subprocess
 import requests
+import shutil
 import git
 from flask_htpasswd import HtPasswdAuth
 
@@ -86,6 +87,55 @@ def api_all(user):
     books = load_all()
     
     return flask.jsonify(books)
+
+@app.route('/api/v1/resources/books/deposit', methods=['POST'])
+@htpasswd.required
+def api_deposit_post(user):
+    user_request = flask.request.get_json(force=True)
+    if "repo_url" in user_request:
+        repo_url = user_request["repo_url"]
+        repo = repo_url.split("/")[-1]
+        user_repo = repo_url.split("/")[-2]
+        provider = repo_url.split("/")[-3]
+        if not ((provider == "github.com") | (provider == "gitlab.com")):
+            flask.abort(400)
+    else:
+        flask.abort(400)
+    if "commit_hash" in user_request:
+        commit = user_request["commit_hash"]
+    else:
+        commit = "HEAD"
+    # checking user commit hash
+    commit_found  = False
+    if commit == "HEAD":
+        refs = git.cmd.Git().ls_remote(repo_url).split("\n")
+        for ref in refs:
+            if ref.split('\t')[1] == "HEAD":
+                commit_hash = ref.split('\t')[0]
+                commit_found = True
+    else:
+        commit_hash = commit
+    local_path = os.path.join("/DATA", "book-artifacts", user_repo, provider, repo, commit_hash, "_build", "html")
+    zenodo_file = os.path.join("/DATA","zenodo","book" + commit_hash)
+    # Create a zip archive for the requested html 
+    shutil.make_archive(zenodo_file, 'zip', local_path)
+    # Create a new deposit
+    headers = {"Content-Type": "application/json"}
+    params = {'access_token': os.environ('ZENODO_API')}
+    r = requests.post('https://sandbox.zenodo.org/api/deposit/depositions',
+                   params=params,
+                   json={},
+                   headers=headers)
+    bucket_url = r.json()["links"]["bucket"]
+    zpath = "/DATA/zenodo"
+    with open(zpath, "rb") as fp:
+        r = requests.put(
+            "%s/%s" % (bucket_url, "book" + commit_hash + ".zip"),
+            data=fp,
+            params=params,
+        )
+    return flask.Response(r.json(), mimetype='text/plain')
+
 
 @app.route('/api/v1/resources/books/sync', methods=['POST'])
 @htpasswd.required
@@ -272,4 +322,6 @@ def previous_request_failed(e):
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=29876)
+
+
 
