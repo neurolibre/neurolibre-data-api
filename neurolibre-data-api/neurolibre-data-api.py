@@ -121,7 +121,7 @@ def api_deposit_post(user):
     shutil.make_archive(zenodo_file, 'zip', local_path)
     # Create a new deposit
     def run():
-        ZENODO_TOKEN = os.environ('ZENODO_API')
+        ZENODO_TOKEN = os.getenv('ZENODO_API')
         headers = {"Content-Type": "application/json"}
         params = {'access_token': ZENODO_TOKEN}
         r = requests.post('https://zenodo.org/api/deposit/depositions',
