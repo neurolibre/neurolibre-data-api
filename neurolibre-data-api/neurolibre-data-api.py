@@ -177,11 +177,11 @@ def api_sync_post(user):
 
     # transfer with rsync
     remote_path = os.path.join("neurolibre-data-test:", "DATA", "book-artifacts", user_repo, provider, repo, commit_hash + "*")
-    remote_path_dbg = os.path.join("\nneurolibre-data-test:", "DATA", "book-artifacts", user_repo, provider, repo, commit_hash + "*")
+    remote_path_dbg = "\nneurolibre-data-test: " + " DATA" + " book-artifacts" + user_repo, provider + repo + commit_hash + "*"
     try:
-        subprocess.check_call(["touch","/DATA/synclog.txt"])
-        with open('/DATA/synclog.txt', "w") as outfile:
-            subprocess.run(remote_path_dbg, stdout=outfile)
+        f = open("/DATA/synclognew.txt", "a")
+        f.write(remote_path_dbg)
+        f.close()
         subprocess.check_call(["rsync", "-avR", remote_path, "/"])
     except subprocess.CalledProcessError:
         flask.abort(404)
