@@ -143,7 +143,6 @@ def api_deposit_post(user):
         else:
             yield "\n" + json.dumps(r.json())
             yield ""
-
     return flask.Response(run(), mimetype='text/plain')
 
 
@@ -179,6 +178,7 @@ def api_sync_post(user):
     # transfer with rsync
     remote_path = os.path.join("neurolibre-data-test:", "DATA", "book-artifacts", user_repo, provider, repo, commit_hash + "*")
     try:
+        subprocess.check_call(["touch","/DATA/madeithere"])
         subprocess.check_call(["rsync", "-avR", remote_path, "/"])
     except subprocess.CalledProcessError:
         flask.abort(404)
