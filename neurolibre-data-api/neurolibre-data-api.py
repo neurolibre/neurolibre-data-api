@@ -177,7 +177,7 @@ def api_sync_post(user):
 
     # transfer with rsync
     remote_path = os.path.join("neurolibre-data-test:", "DATA", "book-artifacts", user_repo, provider, repo, commit_hash + "*")
-    remote_path_dbg = "\nneurolibre-data-test: " + " DATA" + " book-artifacts" + user_repo, provider + repo + commit_hash + "*"
+    remote_path_dbg = "\nneurolibre-data-test: " + " DATA" + " book-artifacts" + user_repo + provider + repo + commit_hash + "*"
     try:
         f = open("/DATA/synclognew.txt", "a")
         f.write(remote_path_dbg)
