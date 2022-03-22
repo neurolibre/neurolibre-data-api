@@ -121,13 +121,14 @@ def api_zenodo_post(user):
     else:
         flask.abort(400)
     def run():
+        collect = {}
         ZENODO_TOKEN = os.getenv('ZENODO_API')
         # Use Bearer auth 
         headers = {"Content-Type": "application/json",
                     "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
         data = {
                 'metadata': {
-                    'title': "BOOK" + root_title,
+                    'title': "BOOK " + root_title,
                     'upload_type': 'publication',
                     'publication_type': 'preprint',
                     'description': 'Jupyter Book built for xyz',
@@ -139,12 +140,33 @@ def api_zenodo_post(user):
         r = requests.post('https://zenodo.org/api/deposit/depositions',
                     headers=headers,
                     data=json.dumps(data))
+        
         if not r:
-            error = {"reason":"404: Something went wrong", "commit_hash":commit_hash, "repo_url":repo_url}
-            yield "\n" + json.dumps(error)
-            yield ""
+            error = {"reason":"404: Something went wrong BOOK", "commit_hash":commit_hash, "repo_url":repo_url}
+            collect["book"] = error
         else:
-            yield "\n" + json.dumps(r.json())
+            collect["book"] = r.json()
+
+        data = {
+                'metadata': {
+                    'title': "DATA " + root_title,
+                    'upload_type': 'dataset',
+                    'description': 'DATA for for xyz',
+                    'creators': [{'name': 'Doe, John',
+                                'affiliation': 'Zenodo'}]
+                }
+            }            
+        # Make an empty deposit to create the bucket 
+        r = requests.post('https://zenodo.org/api/deposit/depositions',
+                    headers=headers,
+                    data=json.dumps(data))
+
+        if not r:
+            error = {"reason":"404: Something went wrong DATA", "commit_hash":commit_hash, "repo_url":repo_url}
+            collect["data"] = error
+        else:
+            collect["data"] = r.json()
+            yield "\n" + json.dumps(collect)
             yield ""
     
     return flask.Response(run(), mimetype='text/plain')
