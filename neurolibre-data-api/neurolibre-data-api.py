@@ -54,6 +54,43 @@ def load_all(globpath=BOOK_PATHS):
 
     return book_collection
 
+def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, commit_user, commit_fork, issue_id):
+    ZENODO_TOKEN = os.getenv('ZENODO_API')
+    headers = {"Content-Type": "application/json",
+                    "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
+    
+    libre_text = f'<p><a href="{fork_url}/commit/{commit_fork}"> reference repository/commit by roboneuro</a></p>'
+    user_text = f'<p><a href="{user_url}/commit/{commit_user}">latest change by the author</a></p>'
+    review_text = f'\n<p>For details, please visit the corresponding <a href="https://github.com/neurolibre/neurolibre-reviews/issues/{issue_id}">NeuroLibre technical screening.</a></p>'
+
+    data = {}
+    data["metadata"] = {}
+    data["metadata"]["title"] = title
+    data["metadata"]["creators"] = creators
+
+    if (archive_type == 'book'):
+        data["metadata"]["upload_type"] = 'publication'
+        data["metadata"]["publication_type"] = 'preprint'
+        data["metadata"]["description"] = 'NeuroLibre JupyterBook built at this ' + libre_text + ', based on the ' + user_text + '.' + review_text
+    elif (archive_type == 'data'):
+        data["metadata"]["upload_type"] = 'dataset'
+        data["metadata"]["description"] = 'Dataset provided for NeuroLibre preprint.\n' + f'Author repo: {user_url}\nNeuroLibre fork:{fork_url}' + review_text
+    elif (archive_type == 'repository'):
+        data["metadata"]["upload_type"] = 'software'
+        data["metadata"]["description"] = 'GitHub archive of the ' + libre_text + ', based on the ' + user_text + '.' + review_text
+    elif (archive_type == 'docker'):
+        data["metadata"]["upload_type"] = 'software'
+        data["metadata"]["description"] = 'Docker image built from the ' + libre_text + ', based on the ' + user_text + ', using repo2docker (through BinderHub).' + review_text
+
+    # Make an empty deposit to create the bucket 
+    r = requests.post('https://zenodo.org/api/deposit/depositions',
+                headers=headers,
+                data=json.dumps(data))
+    if not r:
+        return {"reason":"404: Something went wrong with " + archive_type + " bucket.", "commit_hash":commit_fork, "repo_url":fork_url}
+    else:
+        return r.json()
+
 def doc():
     return """
 <p> Commad line: </p>
@@ -93,81 +130,48 @@ def api_all(user):
 @htpasswd.required
 def api_zenodo_post(user):
     user_request = flask.request.get_json(force=True)
-    if "repo_url" in user_request:
-        repo_url = user_request["repo_url"]
-        repo = repo_url.split("/")[-1]
-        user_repo = repo_url.split("/")[-2]
-        provider = repo_url.split("/")[-3]
-        if not ((provider == "github.com") | (provider == "gitlab.com")):
-            flask.abort(400)
+    if "fork_url" in user_request:
+        fork_url = user_request["fork_url"]
     else:
         flask.abort(400)
-    if "commit_hash" in user_request:
-        commit = user_request["commit_hash"]
+    if "user_url" in user_request:
+        user_url = user_request["user_url"]
     else:
-        commit = "HEAD"
-    # checking user commit hash
-    commit_found  = False
-    if commit == "HEAD":
-        refs = git.cmd.Git().ls_remote(repo_url).split("\n")
-        for ref in refs:
-            if ref.split('\t')[1] == "HEAD":
-                commit_hash = ref.split('\t')[0]
-                commit_found = True
+        flask.abort(400)
+    if "commit_fork" in user_request:
+        commit_fork = user_request["commit_fork"]
     else:
-        commit_hash = commit
+        flask.abort(400)
+    if "commit_user" in user_request:
+        commit_user = user_request["commit_user"]
+    else:
+        flask.abort(400)
     if "title" in user_request:
-        root_title = user_request["title"]
+        title = user_request["title"]
+    else:
+        flask.abort(400)
+    if "issue_id" in user_request:
+        issue_id = user_request["issue_id"]
+    else:
+        flask.abort(400)
+    if "creators" in user_request:
+        creators = user_request["creators"]
     else:
         flask.abort(400)
     def run():
+        resources = ["book","repository","data","docker"]
         collect = {}
-        ZENODO_TOKEN = os.getenv('ZENODO_API')
-        # Use Bearer auth 
-        headers = {"Content-Type": "application/json",
-                    "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
-        data = {
-                'metadata': {
-                    'title': "BOOK " + root_title,
-                    'upload_type': 'publication',
-                    'publication_type': 'preprint',
-                    'description': 'Jupyter Book built for xyz',
-                    'creators': [{'name': 'Doe, John',
-                                'affiliation': 'Zenodo'}]
-                }
-            }            
-        # Make an empty deposit to create the bucket 
-        r = requests.post('https://zenodo.org/api/deposit/depositions',
-                    headers=headers,
-                    data=json.dumps(data))
-        
-        if not r:
-            error = {"reason":"404: Something went wrong BOOK", "commit_hash":commit_hash, "repo_url":repo_url}
-            collect["book"] = error
-        else:
-            collect["book"] = r.json()
+        for archive_type in resources:
+            r = zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, commit_user, commit_fork, issue_id)
+            collect[archive_type] = r
 
-        data = {
-                'metadata': {
-                    'title': "DATA " + root_title,
-                    'upload_type': 'dataset',
-                    'description': 'DATA for for xyz',
-                    'creators': [{'name': 'Doe, John',
-                                'affiliation': 'Zenodo'}]
-                }
-            }            
-        # Make an empty deposit to create the bucket 
-        r = requests.post('https://zenodo.org/api/deposit/depositions',
-                    headers=headers,
-                    data=json.dumps(data))
+        fname = f'zenodo_bucket_{issue_id}.json'
+        local_file = os.path.join("/DATA", "zenodo-records", fname)
+        with open(local_file, 'w') as outfile:
+            json.dump(collect, outfile)
 
-        if not r:
-            error = {"reason":"404: Something went wrong DATA", "commit_hash":commit_hash, "repo_url":repo_url}
-            collect["data"] = error
-        else:
-            collect["data"] = r.json()
-            yield "\n" + json.dumps(collect)
-            yield ""
+        yield "\n" + json.dumps(collect)
+        yield ""
     
     return flask.Response(run(), mimetype='text/plain')
 
