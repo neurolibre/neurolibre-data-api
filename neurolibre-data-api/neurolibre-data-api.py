@@ -122,20 +122,25 @@ def api_deposit_post(user):
     # Create a new deposit
     def run():
         ZENODO_TOKEN = os.getenv('ZENODO_API')
-        headers = {"Content-Type": "application/json"}
-        params = {'access_token': ZENODO_TOKEN}
+        # Use Bearer auth 
+        headers = {"Content-Type": "application/json",
+                   "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
+        # Make an empty deposit to create the bucket 
         r = requests.post('https://zenodo.org/api/deposit/depositions',
-                    params=params,
-                    json={},
-                    headers=headers)
+                    headers=headers,
+                    data=json.dumps({}))
         bucket_url = r.json()["links"]["bucket"]
         zpath = zenodo_file + ".zip"
+        params = {'access_token': ZENODO_TOKEN}
         with open(zpath, "rb") as fp:
-            r = requests.put(
-                "%s/%s" % (bucket_url, "book_" + commit_hash + ".zip"),
-                data=fp,
-                params=params)
+        # text after last '/' is the filename
+        #filename = file_path.split('/')[-1]
+            r = requests.put(f"{bucket_url}/book_{commit_hash}.zip",
+                            params=params,
+                            data=fp)
+
         print(r.json())
+        
         if not r:
             error = {"reason":"404: Something went wrong", "commit_hash":commit_hash, "repo_url":repo_url}
             yield "\n" + json.dumps(error)
