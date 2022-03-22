@@ -88,6 +88,67 @@ def api_all(user):
     
     return flask.jsonify(books)
 
+
+@app.route('/api/v1/resources/zenodo/buckets', methods=['POST'])
+@htpasswd.required
+def api_zenodo_post(user):
+    user_request = flask.request.get_json(force=True)
+    if "repo_url" in user_request:
+        repo_url = user_request["repo_url"]
+        repo = repo_url.split("/")[-1]
+        user_repo = repo_url.split("/")[-2]
+        provider = repo_url.split("/")[-3]
+        if not ((provider == "github.com") | (provider == "gitlab.com")):
+            flask.abort(400)
+    else:
+        flask.abort(400)
+    if "commit_hash" in user_request:
+        commit = user_request["commit_hash"]
+    else:
+        commit = "HEAD"
+    # checking user commit hash
+    commit_found  = False
+    if commit == "HEAD":
+        refs = git.cmd.Git().ls_remote(repo_url).split("\n")
+        for ref in refs:
+            if ref.split('\t')[1] == "HEAD":
+                commit_hash = ref.split('\t')[0]
+                commit_found = True
+    else:
+        commit_hash = commit
+    if "title" in user_request:
+        root_title = user_request["title"]
+    else:
+        flask.abort(400)
+    def run():
+        ZENODO_TOKEN = os.getenv('ZENODO_API')
+        # Use Bearer auth 
+        headers = {"Content-Type": "application/json",
+                    "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
+        data = {
+                'metadata': {
+                    'title': "BOOK" + root_title,
+                    'upload_type': 'publication',
+                    'publication_type': 'preprint',
+                    'description': 'Jupyter Book built for xyz',
+                    'creators': [{'name': 'Doe, John',
+                                'affiliation': 'Zenodo'}]
+                }
+            }            
+        # Make an empty deposit to create the bucket 
+        r = requests.post('https://zenodo.org/api/deposit/depositions',
+                    headers=headers,
+                    data=json.dumps(data))
+        if not r:
+            error = {"reason":"404: Something went wrong", "commit_hash":commit_hash, "repo_url":repo_url}
+            yield "\n" + json.dumps(error)
+            yield ""
+        else:
+            yield "\n" + json.dumps(r.json())
+            yield ""
+    
+    return flask.Response(run(), mimetype='text/plain')
+
 @app.route('/api/v1/resources/books/deposit', methods=['POST'])
 @htpasswd.required
 def api_deposit_post(user):
