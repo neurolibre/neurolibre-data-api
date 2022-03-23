@@ -59,9 +59,10 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
     headers = {"Content-Type": "application/json",
                     "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
     
-    libre_text = f'<p><a href="{fork_url}/commit/{commit_fork}"> reference repository/commit by roboneuro</a></p>'
-    user_text = f'<p><a href="{user_url}/commit/{commit_user}">latest change by the author</a></p>'
-    review_text = f'\n<p>For details, please visit the corresponding <a href="https://github.com/neurolibre/neurolibre-reviews/issues/{issue_id}">NeuroLibre technical screening.</a></p>'
+    libre_text = f'<a href="{fork_url}/commit/{commit_fork}"> reference repository/commit by roboneuro</a>'
+    user_text = f'<a href="{user_url}/commit/{commit_user}">latest change by the author</a>'
+    review_text = f'<p>For details, please visit the corresponding <a href="https://github.com/neurolibre/neurolibre-reviews/issues/{issue_id}">NeuroLibre technical screening.</a></p>'
+    sign_text = '\n<p><strong><a href="https://neurolibre.org" target="NeuroLibre">https://neurolibre.org</a></strong></p>'
 
     data = {}
     data["metadata"] = {}
@@ -71,16 +72,16 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
     if (archive_type == 'book'):
         data["metadata"]["upload_type"] = 'publication'
         data["metadata"]["publication_type"] = 'preprint'
-        data["metadata"]["description"] = 'NeuroLibre JupyterBook built at this ' + libre_text + ', based on the ' + user_text + '.' + review_text
+        data["metadata"]["description"] = 'NeuroLibre JupyterBook built at this ' + libre_text + ', based on the ' + user_text + '.' + review_text + sign_text
     elif (archive_type == 'data'):
         data["metadata"]["upload_type"] = 'dataset'
-        data["metadata"]["description"] = 'Dataset provided for NeuroLibre preprint.\n' + f'Author repo: {user_url}\nNeuroLibre fork:{fork_url}' + review_text
+        data["metadata"]["description"] = 'Dataset provided for NeuroLibre preprint.\n' + f'Author repo: {user_url}\nNeuroLibre fork:{fork_url}' + review_text + sign_text
     elif (archive_type == 'repository'):
         data["metadata"]["upload_type"] = 'software'
-        data["metadata"]["description"] = 'GitHub archive of the ' + libre_text + ', based on the ' + user_text + '.' + review_text
+        data["metadata"]["description"] = 'GitHub archive of the ' + libre_text + ', based on the ' + user_text + '.' + review_text + sign_text
     elif (archive_type == 'docker'):
         data["metadata"]["upload_type"] = 'software'
-        data["metadata"]["description"] = 'Docker image built from the ' + libre_text + ', based on the ' + user_text + ', using repo2docker (through BinderHub).' + review_text
+        data["metadata"]["description"] = 'Docker image built from the ' + libre_text + ', based on the ' + user_text + ', using repo2docker (through BinderHub).' + review_text + sign_text
 
     # Make an empty deposit to create the bucket 
     r = requests.post('https://zenodo.org/api/deposit/depositions',
