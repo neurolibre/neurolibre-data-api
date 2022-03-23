@@ -162,27 +162,72 @@ def api_zenodo_post(user):
         creators = user_request["creators"]
     else:
         flask.abort(400)
+    if "deposit_data" in user_request:
+        deposit_data = user_request["deposit_data"]
+    else:
+        flask.abort(400)
     def run():
-        resources = ["book","repository","data","docker"]
-        collect = {}
-        for archive_type in resources:
-            r = zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, commit_user, commit_fork, issue_id)
-            collect[archive_type] = r
+        ZENODO_TOKEN = os.getenv('ZENODO_API')
+        headers = {"Content-Type": "application/json", "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
 
         fname = f"zenodo_deposit_NeuroLibre_{'%05d'%issue_id}.json"
         local_file = os.path.join("/DATA", "zenodo-records", fname)
-        with open(local_file, 'w') as outfile:
-            json.dump(collect, outfile)
+        
+        collect = {}
 
+        if os.path.exists(local_file):
+            # File already exists, do nothing.
+            collect["message"] = f"Zenodo records already exist for this submission on NeuroLibre servers: {fname}"
+        else:
+            # File does not exist, move on.
+
+            if deposit_data:
+                # User does not have DOI'd data, we'll create.
+                resources = ["book","repository","data","docker"]
+            else:
+                # Do not create a record for data, user already did.
+                resources = ["book","repository","docker"]
+
+            for archive_type in resources:
+                r = zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, commit_user, commit_fork, issue_id)
+                collect[archive_type] = r
+                time.sleep(0.5)
+
+            if {k: v for k, v in collect.items() if 'reason' in v}:
+                # This means at least one of the deposits has failed.
+                print('Caught deposit issue. JSON will not be written.')
+                # Delete deposition if succeeded for a certain resource
+                remove_dict = {k: v for k, v in collect.items() if not 'reason' in v }
+                for key in remove_dict:
+                    print("Deleting " + remove_dict[key]["links"]["self"])
+                    tmp = requests.delete(remove_dict[key]["links"]["self"], headers=headers)
+                    time.sleep(0.5)
+                    # Returns 204 if successful, cast str to display
+                    collect[key + "_deleted"] = str(tmp)
+            else:
+                # This means that all requested deposits are successful
+                print(f'Writing {local_file}...')
+                with open(local_file, 'w') as outfile:
+                    json.dump(collect, outfile)
+
+        # The response will be returned to the caller regardless of the state.
         yield "\n" + json.dumps(collect)
         yield ""
     
     return flask.Response(run(), mimetype='text/plain')
 
-@app.route('/api/v1/resources/books/deposit', methods=['POST'])
+@app.route('/api/v1/resources/zenodo/upload', methods=['POST'])
 @htpasswd.required
-def api_deposit_post(user):
+def api_upload_post(user):
     user_request = flask.request.get_json(force=True)
+    if "issue_id" in user_request:
+        issue_id = user_request["issue_id"]
+    else:
+        flask.abort(400)
+    if "items" in user_request:
+        items = user_request["items"]
+    else:
+        flask.abort(400)
     if "repo_url" in user_request:
         repo_url = user_request["repo_url"]
         repo = repo_url.split("/")[-1]
@@ -192,26 +237,19 @@ def api_deposit_post(user):
             flask.abort(400)
     else:
         flask.abort(400)
-    if "commit_hash" in user_request:
-        commit = user_request["commit_hash"]
-    else:
-        commit = "HEAD"
-    # checking user commit hash
-    commit_found  = False
-    if commit == "HEAD":
-        refs = git.cmd.Git().ls_remote(repo_url).split("\n")
-        for ref in refs:
-            if ref.split('\t')[1] == "HEAD":
-                commit_hash = ref.split('\t')[0]
-                commit_found = True
-    else:
-        commit_hash = commit
-    local_path = os.path.join("/DATA", "book-artifacts", user_repo, provider, repo, commit_hash, "_build", "html")
-    zenodo_file = os.path.join("/DATA","zenodo","book_" + commit_hash)
-    # Create a zip archive for the requested html 
-    shutil.make_archive(zenodo_file, 'zip', local_path)
+
+    # local_path = os.path.join("/DATA", "book-artifacts", user_repo, provider, repo, commit_hash, "_build", "html")
+    # zenodo_file = os.path.join("/DATA","zenodo","book_" + commit_hash)
+
+    # shutil.make_archive(zenodo_file, 'zip', local_path)
+
     # Create a new deposit
     def run():
+        fname = f"zenodo_deposit_NeuroLibre_{'%05d'%issue_id}.json"
+        local_file = os.path.join("/DATA", "zenodo-records", fname)
+        with open(local_file, 'r') as f:
+            zenodo_record = json.load(f)
+
         ZENODO_TOKEN = os.getenv('ZENODO_API')
         # Use Bearer auth 
         headers = {"Content-Type": "application/json",
