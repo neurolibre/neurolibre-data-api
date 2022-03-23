@@ -68,6 +68,7 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
     data["metadata"] = {}
     data["metadata"]["title"] = title
     data["metadata"]["creators"] = creators
+    data["metadata"]["keywords"] = ["canadian-open-neuroscience-platform"]
 
     if (archive_type == 'book'):
         data["metadata"]["upload_type"] = 'publication'
