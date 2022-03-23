@@ -224,59 +224,64 @@ def api_upload_post(user):
         issue_id = user_request["issue_id"]
     else:
         flask.abort(400)
-    if "items" in user_request:
-        items = user_request["items"]
+    if "repository_address" in user_request:
+        user_repo_address = user_request["repository_address"]
     else:
         flask.abort(400)
-    if "repo_url" in user_request:
-        repo_url = user_request["repo_url"]
-        repo = repo_url.split("/")[-1]
-        user_repo = repo_url.split("/")[-2]
-        provider = repo_url.split("/")[-3]
-        if not ((provider == "github.com") | (provider == "gitlab.com")):
+    if "item" in user_request:
+        item = user_request["item"]
+    else:
+        flask.abort(400)
+    if "fork_url" in user_request:
+        fork_url = user_request["fork_url"]
+        repofork = fork_url.split("/")[-1]
+        fork_repo = fork_url.split("/")[-2]
+        fork_provider = fork_url.split("/")[-3]
+        if not ((fork_provider == "github.com") | (fork_provider == "gitlab.com")):
             flask.abort(400)
     else:
         flask.abort(400)
-
-    # local_path = os.path.join("/DATA", "book-artifacts", user_repo, provider, repo, commit_hash, "_build", "html")
-    # zenodo_file = os.path.join("/DATA","zenodo","book_" + commit_hash)
-
-    # shutil.make_archive(zenodo_file, 'zip', local_path)
-
-    # Create a new deposit
+    if "commit_fork" in user_request:
+        commit_fork = user_request["commit_fork"]
+    else:
+        flask.abort(400)
     def run():
+        # Set env
+        ZENODO_TOKEN = os.getenv('ZENODO_API')
+        params = {'access_token': ZENODO_TOKEN}
+        # Read json record of the deposit
         fname = f"zenodo_deposit_NeuroLibre_{'%05d'%issue_id}.json"
         local_file = os.path.join("/DATA", "zenodo-records", fname)
         with open(local_file, 'r') as f:
             zenodo_record = json.load(f)
+        # Fetch bucket url of the requested type of item
+        bucket_url = zenodo_record[item]['links']['bucket']
 
-        ZENODO_TOKEN = os.getenv('ZENODO_API')
-        # Use Bearer auth 
-        headers = {"Content-Type": "application/json",
-                   "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
-        # Make an empty deposit to create the bucket 
-        r = requests.post('https://zenodo.org/api/deposit/depositions',
-                    headers=headers,
-                    data=json.dumps({}))
-        bucket_url = r.json()["links"]["bucket"]
-        zpath = zenodo_file + ".zip"
-        params = {'access_token': ZENODO_TOKEN}
-        with open(zpath, "rb") as fp:
-        # text after last '/' is the filename
-        #filename = file_path.split('/')[-1]
-            r = requests.put(f"{bucket_url}/book_{commit_hash}.zip",
-                            params=params,
-                            data=fp)
-
-        print(r.json())
+        if item == "book":
+           # We will archive the book created through the forked repository.
+           local_path = os.path.join("/DATA", "book-artifacts", fork_repo, fork_provider, repofork, commit_fork, "_build", "html")
+           # Descriptive file name
+           zenodo_file = os.path.join("/DATA","zenodo",f"JupyterBook_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}")
+           # Zip it!
+           shutil.make_archive(zenodo_file, 'zip', local_path)
+           zpath = zenodo_file + ".zip"
         
-        if not r:
-            error = {"reason":"404: Something went wrong", "commit_hash":commit_hash, "repo_url":repo_url}
+           with open(zpath, "rb") as fp:
+            r = requests.put(f"{bucket_url}/JupyterBook_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
+                                    params=params,
+                                    data=fp)
+           if not r:
+            error = {"reason":"404: Something went wrong", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
             yield "\n" + json.dumps(error)
             yield ""
-        else:
+           else:
+            tmp = f"zenodo_upload_{item}_NeuroLibre_{'%05d'%issue_id}.json"
+            log_file = os.path.join("/DATA", "zenodo-records", tmp)
+            with open(log_file, 'w') as outfile:
+                    json.dump(r.json(), outfile)
             yield "\n" + json.dumps(r.json())
             yield ""
+
     return flask.Response(run(), mimetype='text/plain')
 
 
