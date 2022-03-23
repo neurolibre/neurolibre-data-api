@@ -69,6 +69,7 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
     data["metadata"]["title"] = title
     data["metadata"]["creators"] = creators
     data["metadata"]["keywords"] = ["canadian-open-neuroscience-platform"]
+    data["metadata"]["related_identifiers"] = {"scheme": "doi","identifier": f"10.55458/NeuroLibre.{'%05d'%issue_id}","relation": "isDocumentedBy","resource_type": "publication-preprint"}
 
     if (archive_type == 'book'):
         data["metadata"]["upload_type"] = 'publication'
@@ -167,7 +168,7 @@ def api_zenodo_post(user):
             r = zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, commit_user, commit_fork, issue_id)
             collect[archive_type] = r
 
-        fname = f'zenodo_bucket_{issue_id}.json'
+        fname = f"zenodo_10.55458_NeuroLibre.{'%05d'%issue_id}.json"
         local_file = os.path.join("/DATA", "zenodo-records", fname)
         with open(local_file, 'w') as outfile:
             json.dump(collect, outfile)
