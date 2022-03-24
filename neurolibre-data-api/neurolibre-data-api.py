@@ -15,6 +15,7 @@ from flask_htpasswd import HtPasswdAuth
 # GLOBAL VARIABLES
 BOOK_PATHS = "/DATA/book-artifacts/*/*/*/*.tar.gz"
 BOOK_URL = "http://neurolibre-data-prod.conp.cloud/book-artifacts"
+DOCKER_REGISTRY = "https://binder-registry.conp.cloud"
 
 #https://programminghistorian.org/en/lessons/creating-apis-with-python-and-flask
 
@@ -91,9 +92,43 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
                 headers=headers,
                 data=json.dumps(data))
     if not r:
-        return {"reason":"404: Something went wrong with " + archive_type + " bucket.", "commit_hash":commit_fork, "repo_url":fork_url}
+        return {"reason":"404: Cannot create " + archive_type + " bucket.", "commit_hash":commit_fork, "repo_url":fork_url}
     else:
         return r.json()
+
+def docker_login():
+    uname = os.getenv('DOCKER_USERNAME')
+    pswd = os.getenv('DOCKER_PASSWORD')
+    resp = os.system(f"echo {pswd} | docker login {DOCKER_REGISTRY} --username {uname} --password-stdin")
+    return resp
+
+def docker_logout():
+    resp=os.system(f"docker logout {DOCKER_REGISTRY}")
+    return resp
+
+def docker_pull(image):
+    resp = os.system(f"docker pull {image}")
+    return resp
+
+def docker_export(image,issue_id,commit_fork):
+    save_name = os.path.join(get_archive_dir(issue_id),f"DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.tar.gz")
+    resp=os.system(f"docker save {image} | gzip > {save_name}")
+    return resp, save_name
+
+def get_archive_dir(issue_id):
+    path = f"/DATA/zenodo/{'%05d'%issue_id}"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
+
+def get_deposit_dir(issue_id):
+    path = f"/DATA/zenodo_records/{'%05d'%issue_id}"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
+
+# docker rmi $(docker images 'busybox' -a -q)
+
 
 def doc():
     return """
@@ -171,7 +206,7 @@ def api_zenodo_post(user):
         headers = {"Content-Type": "application/json", "Authorization": "Bearer {}".format(ZENODO_TOKEN)}
 
         fname = f"zenodo_deposit_NeuroLibre_{'%05d'%issue_id}.json"
-        local_file = os.path.join("/DATA", "zenodo-records", fname)
+        local_file = os.path.join(get_deposit_dir(issue_id), fname)
         
         collect = {}
 
@@ -232,6 +267,10 @@ def api_upload_post(user):
         item = user_request["item"]
     else:
         flask.abort(400)
+    if "item_arg" in user_request:
+        item_arg = user_request["item_arg"]
+    else:
+        flask.abort(400)
     if "fork_url" in user_request:
         fork_url = user_request["fork_url"]
         repofork = fork_url.split("/")[-1]
@@ -251,7 +290,7 @@ def api_upload_post(user):
         params = {'access_token': ZENODO_TOKEN}
         # Read json record of the deposit
         fname = f"zenodo_deposit_NeuroLibre_{'%05d'%issue_id}.json"
-        local_file = os.path.join("/DATA", "zenodo-records", fname)
+        local_file = os.path.join(get_deposit_dir(issue_id), fname)
         with open(local_file, 'r') as f:
             zenodo_record = json.load(f)
         # Fetch bucket url of the requested type of item
@@ -261,7 +300,7 @@ def api_upload_post(user):
            # We will archive the book created through the forked repository.
            local_path = os.path.join("/DATA", "book-artifacts", fork_repo, fork_provider, repofork, commit_fork, "_build", "html")
            # Descriptive file name
-           zenodo_file = os.path.join("/DATA","zenodo",f"JupyterBook_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}")
+           zenodo_file = os.path.join(get_archive_dir(issue_id),f"JupyterBook_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}")
            # Zip it!
            shutil.make_archive(zenodo_file, 'zip', local_path)
            zpath = zenodo_file + ".zip"
@@ -271,16 +310,52 @@ def api_upload_post(user):
                                     params=params,
                                     data=fp)
            if not r:
-            error = {"reason":"404: Something went wrong", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+            error = {"reason":f"404: Cannot upload {zpath} to {bucket_url}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
             yield "\n" + json.dumps(error)
             yield ""
            else:
-            tmp = f"zenodo_upload_{item}_NeuroLibre_{'%05d'%issue_id}.json"
-            log_file = os.path.join("/DATA", "zenodo-records", tmp)
+            tmp = f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.json"
+            log_file = os.path.join(get_archive_dir(issue_id), tmp)
             with open(log_file, 'w') as outfile:
                     json.dump(r.json(), outfile)
+            
             yield "\n" + json.dumps(r.json())
             yield ""
+
+        elif item == "docker":
+
+            docker_login()
+            # Docker image address should be here
+            docker_pull(item_arg)
+
+            in_r = docker_export(item_arg,issue_id,commit_fork)
+            # in_r[0] os.system status, in_r[1] saved docker image absolute path
+
+            docker_logout()
+            if in_r[0] == 0:
+                # Means that saved successfully, upload to zenodo.
+                with open(in_r[1], "rb") as fp:
+                    r = requests.put(f"{bucket_url}/DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
+                                    params=params,
+                                    data=fp)
+                
+                if not r:
+                    error = {"reason":f"404: Cannot upload {in_r[1]} to {bucket_url}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+                    yield "\n" + json.dumps(error)
+                    yield ""
+                else:
+                    tmp = f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.json"
+                    log_file = os.path.join(get_archive_dir(issue_id), tmp)
+                    with open(log_file, 'w') as outfile:
+                            json.dump(r.json(), outfile)
+
+                    yield "\n" + json.dumps(r.json())
+                    yield ""
+            else:
+            # Cannot save docker image succesfully
+                error = {"reason":f"404: Cannot save requested docker image as tar.gz: {item_arg}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+                yield "\n" + json.dumps(error)
+                yield ""
 
     return flask.Response(run(), mimetype='text/plain')
 
