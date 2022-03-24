@@ -315,7 +315,7 @@ def api_upload_post(user):
             yield ""
            else:
             tmp = f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.json"
-            log_file = os.path.join(get_archive_dir(issue_id), tmp)
+            log_file = os.path.join(get_deposit_dir(issue_id), tmp)
             with open(log_file, 'w') as outfile:
                     json.dump(r.json(), outfile)
             
@@ -338,14 +338,14 @@ def api_upload_post(user):
                     r = requests.put(f"{bucket_url}/DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
                                     params=params,
                                     data=fp)
-                
+                # TO_DO: Write a function to handle this, too many repetitions rn.
                 if not r:
                     error = {"reason":f"404: Cannot upload {in_r[1]} to {bucket_url}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
                     yield "\n" + json.dumps(error)
                     yield ""
                 else:
                     tmp = f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.json"
-                    log_file = os.path.join(get_archive_dir(issue_id), tmp)
+                    log_file = os.path.join(get_deposit_dir(issue_id), tmp)
                     with open(log_file, 'w') as outfile:
                             json.dump(r.json(), outfile)
 
@@ -356,6 +356,64 @@ def api_upload_post(user):
                 error = {"reason":f"404: Cannot save requested docker image as tar.gz: {item_arg}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
                 yield "\n" + json.dumps(error)
                 yield ""
+
+        elif item == "repository":
+            
+            download_url_main = f"{fork_url}/archive/refs/heads/main.zip"
+            download_url_master = f"{fork_url}/archive/refs/heads/master.zip"
+
+            zenodo_file = os.path.join(get_archive_dir(issue_id),f"GitHubRepo_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip")
+            
+            # REFACTOR HERE AND MANAGE CONDITIONS CLEANER.
+            # Try main first
+            resp = os.system(f"wget -O {zenodo_file} {download_url_main}")
+            if resp != 0:
+                # Try master 
+                resp2 = os.system(f"wget -O {zenodo_file} {download_url_master}")
+                if resp2 != 0:
+                    error = {"reason":f"404: Cannot download repository at {download_url_main} or from master branch.", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+                    yield "\n" + json.dumps(error)
+                    yield ""
+                    # TRY FLASK.ABORT(code,custom) here for refactoring.
+                else:
+                    # Upload to Zenodo
+                    with open(zenodo_file, "rb") as fp:
+                        r = requests.put(f"{bucket_url}/GitHubRepo_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
+                                        params=params,
+                                        data=fp)
+                        if not r:
+                            error = {"reason":f"404: Cannot upload {zenodo_file} to {bucket_url}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+                            yield "\n" + json.dumps(error)
+                            yield ""
+                        else:
+                            tmp = f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.json"
+                            log_file = os.path.join(get_deposit_dir(issue_id), tmp)
+                            with open(log_file, 'w') as outfile:
+                                    json.dump(r.json(), outfile)
+                        # Return answer to flask
+                        yield "\n" + json.dumps(r.json())
+                        yield ""
+            else: 
+                # main worked
+                # Upload to Zenodo
+                with open(zenodo_file, "rb") as fp:
+                    r = requests.put(f"{bucket_url}/GitHubRepo_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
+                                    params=params,
+                                    data=fp)
+                    if not r:
+                            error = {"reason":f"404: Cannot upload {zenodo_file} to {bucket_url}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+                            yield "\n" + json.dumps(error)
+                            yield ""
+                    else:
+                        tmp = f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.json"
+                        log_file = os.path.join(get_deposit_dir(issue_id), tmp)
+                        with open(log_file, 'w') as outfile:
+                                json.dump(r.json(), outfile)
+                        # Return answer to flask
+                        yield "\n" + json.dumps(r.json())
+                        yield ""
+            
+            
 
     return flask.Response(run(), mimetype='text/plain')
 
