@@ -417,6 +417,30 @@ def api_upload_post(user):
 
     return flask.Response(run(), mimetype='text/plain')
 
+@app.route('/api/v1/resources/zenodo/list', methods=['POST'])
+@htpasswd.required
+def api_zenodo_list_post(user):
+    user_request = flask.request.get_json(force=True)
+    if "issue_id" in user_request:
+        issue_id = user_request["issue_id"]
+    else:
+        flask.abort(400)
+    def run():
+        # Set env
+        path = f"/DATA/zenodo_records/{'%05d'%issue_id}"
+        if not os.path.exists(path):
+            yield "<br> :neutral_face: I could not find any Zenodo-related records on NeuroLibre servers. Maybe start with `roboneuro zenodo deposit`?"
+        else:
+            files = os.listdir(path)
+            yield "<br> These are the Zenodo records I have on NeuroLibre servers:"
+            yield "<ul>"
+            for file in files:
+                yield f"<li>{file}</li>"
+            yield "</ul>"
+
+    return flask.Response(run(), mimetype='text/plain')
+
+
 
 @app.route('/api/v1/resources/books/sync', methods=['POST'])
 @htpasswd.required
