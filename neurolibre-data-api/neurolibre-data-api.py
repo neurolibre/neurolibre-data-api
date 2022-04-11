@@ -70,7 +70,7 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
     data["metadata"]["title"] = title
     data["metadata"]["creators"] = creators
     data["metadata"]["keywords"] = ["canadian-open-neuroscience-platform"]
-    data["metadata"]["related_identifiers"] = [{"relation": "isDocumentedBy","identifier": f"10.55458/NeuroLibre.{'%05d'%issue_id}","resource_type": "publication-preprint"}]
+    data["metadata"]["related_identifiers"] = [{"relation": "isPartOf","identifier": f"10.55458/NeuroLibre.{'%05d'%issue_id}","resource_type": "publication-preprint"}]
     data["metadata"]["contributors"] = [{'name':'Neuro, Robo', 'affiliation': 'NeuroLibre', 'type': 'ContactPerson' }]
 
     if (archive_type == 'book'):
