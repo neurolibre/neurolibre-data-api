@@ -136,6 +136,8 @@ def doc():
 <p> &nbsp; curl -u user:pwd </p>
 <p> Synchronize jupyter book build from test server (\"commit_hash\" defaults to HEAD): </p>
 <p> &nbsp; POST &nbsp; &nbsp; -H "Content-Type: application/json" -d '{"repo_url":"https://github.com/ltetrel/nha2020-nilearn", "commit_hash":"e29aa259f6807e62610bc84a86d406065028fe29"}' /api/v1/resources/books/sync </p>
+<p> Synchronize data from test server: </p>
+<p> &nbsp; POST &nbsp; &nbsp; -H "Content-Type: application/json" -d '{"project_name": "nilearn_data"}' /api/v1/resources/data/sync </p>
 <p> Binder build a specific repository (\"commit_hash\" defaults to HEAD): </p>
 <p> &nbsp; POST &nbsp; &nbsp; -H "Content-Type: application/json" -d '{"repo_url":"https://github.com/ltetrel/nha2020-nilearn", "commit_hash":"e29aa259f6807e62610bc84a86d406065028fe29"}' /api/v1/resources/binder/build</p>
 <p> List all books </p>
