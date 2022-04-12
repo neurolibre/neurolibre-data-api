@@ -454,7 +454,7 @@ def api_data_sync_post(user):
         flask.abort(400)
 
     # transfer with rsync
-    remote_path = os.path.join("neurolibre-data-test:", "DATA", project_name)
+    remote_path = os.path.join("neurolibre-test-api:", "DATA", project_name)
     try:
         f = open("/DATA/data_synclog.txt", "a")
         f.write(remote_path)
@@ -500,7 +500,7 @@ def api_books_sync_post(user):
         commit_hash = commit
 
     # transfer with rsync
-    remote_path = os.path.join("neurolibre-data-test:", "DATA", "book-artifacts", user_repo, provider, repo, commit_hash + "*")
+    remote_path = os.path.join("neurolibre-test-api:", "DATA", "book-artifacts", user_repo, provider, repo, commit_hash + "*")
     try:
         f = open("/DATA/synclog.txt", "a")
         f.write(remote_path)
