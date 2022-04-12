@@ -70,7 +70,7 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
     data["metadata"]["title"] = title
     data["metadata"]["creators"] = creators
     data["metadata"]["keywords"] = ["canadian-open-neuroscience-platform"]
-    data["metadata"]["related_identifiers"] = [{"relation": "isPartOf","identifier": f"10.55458/NeuroLibre.{'%05d'%issue_id}","resource_type": "publication-preprint"}]
+    data["metadata"]["related_identifiers"] = [{"relation": "isDocumentedBy","identifier": f"10.55458/NeuroLibre.{'%05d'%issue_id}","resource_type": "publication-preprint"}]
     data["metadata"]["contributors"] = [{'name':'Neuro, Robo', 'affiliation': 'NeuroLibre', 'type': 'ContactPerson' }]
 
     if (archive_type == 'book'):
@@ -441,10 +441,36 @@ def api_zenodo_list_post(user):
     return flask.Response(run(), mimetype='text/plain')
 
 
+@app.route('/api/v1/resources/data/sync', methods=['POST'])
+@htpasswd.required
+def api_data_sync_post(user):
+    user_request = flask.request.get_json(force=True)
+
+    if "project_name" in user_request:
+        project_name = user_request["project_name"]
+    else:
+        flask.abort(400)
+
+    # transfer with rsync
+    remote_path = os.path.join("neurolibre-data-test:", "DATA", project_name)
+    try:
+        f = open("/DATA/data_synclog.txt", "a")
+        f.write(remote_path)
+        f.close()
+        subprocess.check_call(["rsync", "-avR", remote_path, "/"])
+    except subprocess.CalledProcessError:
+        flask.abort(404)
+
+    # final check
+    if len(os.listdir(os.path.join("/DATA", project_name))) == 0:
+        return {"reason": "404: Data sync was not successfull.", "project_name": project_name}
+    else:
+        return {"reason": "200: Data sync succeeded."}
+
 
 @app.route('/api/v1/resources/books/sync', methods=['POST'])
 @htpasswd.required
-def api_sync_post(user):
+def api_books_sync_post(user):
     user_request = flask.request.get_json(force=True)
 
     if "repo_url" in user_request:
