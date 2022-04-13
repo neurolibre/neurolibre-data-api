@@ -414,8 +414,35 @@ def api_upload_post(user):
                         # Return answer to flask
                         yield "\n" + json.dumps(r.json())
                         yield ""
-            
-            
+
+        elif item == "data":
+           # We will archive the data synced from the test server. (item_arg is the project_name, indicating that the 
+           # data is stored at the /DATA/project_name folder)
+           local_path = os.path.join("/DATA", item_arg)
+           # Descriptive file name
+           zenodo_file = os.path.join(get_archive_dir(issue_id),f"Dataset_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}")
+           # Zip it!
+           shutil.make_archive(zenodo_file, 'zip', local_path)
+           zpath = zenodo_file + ".zip"
+
+           # UPLOAD data to zenodo        
+           with open(zpath, "rb") as fp:
+            r = requests.put(f"{bucket_url}/Dataset_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
+                                    params=params,
+                                    data=fp)
+
+            if not r:
+                error = {"reason":f"404: Cannot upload {zenodo_file} to {bucket_url}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+                yield "\n" + json.dumps(error)
+                yield ""
+            else:
+                tmp = f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.json"
+                log_file = os.path.join(get_deposit_dir(issue_id), tmp)
+                with open(log_file, 'w') as outfile:
+                        json.dump(r.json(), outfile)
+                # Return answer to flask
+                yield "\n" + json.dumps(r.json())
+                yield ""
 
     return flask.Response(run(), mimetype='text/plain')
 
