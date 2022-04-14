@@ -8,6 +8,9 @@ import requests
 import shutil
 import git
 from flask_htpasswd import HtPasswdAuth
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # https://stackoverflow.com/questions/41410199/how-to-configure-nginx-to-pass-user-info-to-wsgi-flask
 # https://blog.miguelgrinberg.com/post/restful-authentication-with-flask
