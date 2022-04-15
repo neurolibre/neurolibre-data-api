@@ -497,6 +497,7 @@ def api_zenodo_flush_post(user):
         # Read json record of the deposit
         fname = f"zenodo_deposit_NeuroLibre_{'%05d'%issue_id}.json"
         local_file = os.path.join(get_deposit_dir(issue_id), fname)
+        dat2recmap = {"data":"Dataset","repository":"GitHubRepo","docker":"DockerImage","book":"JupyterBook"}
         
         with open(local_file, 'r') as f:
             zenodo_record = json.load(f)
@@ -508,12 +509,31 @@ def api_zenodo_flush_post(user):
             if r3.status_code == 204:
                 yield f"\n Deleted {item} deposit successfully at {self_url}."
                 yield ""
+                # We need to delete these from the Zenodo records file
+                if item in zenodo_record: del zenodo_record[item]
+                # Flush ALL the upload records (json) associated with the item
+                tmp_record = glob.glob(os.path.join(get_deposit_dir(issue_id),f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_*.json"))
+                if tmp_record:
+                    for f in tmp_record:
+                        os.remove(f)
+                # Flush ALL the uploaded files associated with the item
+                tmp_file = glob.glob(os.path.join(get_archive_dir(issue_id),f"{dat2recmap[item]}_10.55458_NeuroLibre_{'%05d'%issue_id}_*.zip"))
+                if tmp_file:
+                    for f in tmp_file:
+                        os.remove(f)
             elif r3.status_code == 403: 
                 yield f"\n The {item} archive has already been published, cannot be deleted."
                 yield ""
             elif r3.status_code == 410:
                 yield f"\n The {item} deposit does not exist."
                 yield ""
+        # Write zenodo record json file or rm existing one if empty at this point
+        # Delete the old one
+        os.remove(local_file)
+        # Write the new one
+        if zenodo_record:
+            with open(local_file, 'w') as outfile:
+                json.dump(zenodo_record, outfile)
 
     return flask.Response(run(), mimetype='text/plain')
 
