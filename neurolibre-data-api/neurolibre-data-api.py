@@ -10,6 +10,7 @@ import git
 from flask_htpasswd import HtPasswdAuth
 from dotenv import load_dotenv
 
+# THIS IS NEEDED UNLESS FLASK IS CONFIGURED TO AUTO-LOAD!
 load_dotenv()
 
 # https://stackoverflow.com/questions/41410199/how-to-configure-nginx-to-pass-user-info-to-wsgi-flask
@@ -72,9 +73,10 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
     data["metadata"] = {}
     data["metadata"]["title"] = title
     data["metadata"]["creators"] = creators
-    data["metadata"]["keywords"] = ["canadian-open-neuroscience-platform"]
-    data["metadata"]["related_identifiers"] = [{"relation": "isDocumentedBy","identifier": f"10.55458/NeuroLibre.{'%05d'%issue_id}","resource_type": "publication-preprint"}]
-    data["metadata"]["contributors"] = [{'name':'Neuro, Robo', 'affiliation': 'NeuroLibre', 'type': 'ContactPerson' }]
+    data["metadata"]["keywords"] = ["canadian-open-neuroscience-platform","neurolibre"]
+    # (A) NeuroLibre artifact is a part of (isPartOf) the NeuroLibre preprint (B 10.55458/NeuroLibre.issue_id)
+    data["metadata"]["related_identifiers"] = [{"relation": "isPartOf","identifier": f"10.55458/NeuroLibre.{'%05d'%issue_id}","resource_type": "publication-preprint"}]
+    data["metadata"]["contributors"] = [{'name':'NeuroLibre, Admin', 'affiliation': 'NeuroLibre', 'type': 'ContactPerson' }]
 
     if (archive_type == 'book'):
         data["metadata"]["upload_type"] = 'publication'
@@ -170,6 +172,7 @@ def api_all(user):
     return flask.jsonify(books)
 
 
+# ---------------------------- CREATE ZENODO DEPOSITS
 @app.route('/api/v1/resources/zenodo/buckets', methods=['POST'])
 @htpasswd.required
 def api_zenodo_post(user):
@@ -256,6 +259,7 @@ def api_zenodo_post(user):
     
     return flask.Response(run(), mimetype='text/plain')
 
+# ---------------------------- UPLOAD ARTIFACTS TO ZENODO
 @app.route('/api/v1/resources/zenodo/upload', methods=['POST'])
 @htpasswd.required
 def api_upload_post(user):
@@ -449,6 +453,7 @@ def api_upload_post(user):
 
     return flask.Response(run(), mimetype='text/plain')
 
+# ---------------------------- LIST ZENODO RESOURCES ON PROD
 @app.route('/api/v1/resources/zenodo/list', methods=['POST'])
 @htpasswd.required
 def api_zenodo_list_post(user):
@@ -472,6 +477,45 @@ def api_zenodo_list_post(user):
 
     return flask.Response(run(), mimetype='text/plain')
 
+# ---------------------------- DELETE ZENODO DEPOSITS
+@app.route('/api/v1/resources/zenodo/flush', methods=['POST'])
+@htpasswd.required
+def api_zenodo_flush_post(user):
+    user_request = flask.request.get_json(force=True)
+    if "issue_id" in user_request:
+        issue_id = user_request["issue_id"]
+    else:
+        flask.abort(400)
+    if "items" in user_request:
+        items = user_request["items"]
+    else:
+        flask.abort(400)
+    def run():
+    # Set env
+        ZENODO_TOKEN = os.getenv('ZENODO_API')
+        headers = {"Content-Type": "application/json","Authorization": "Bearer {}".format(ZENODO_TOKEN)}
+        # Read json record of the deposit
+        fname = f"zenodo_deposit_NeuroLibre_{'%05d'%issue_id}.json"
+        local_file = os.path.join(get_deposit_dir(issue_id), fname)
+        
+        with open(local_file, 'r') as f:
+            zenodo_record = json.load(f)
+
+        for item in items: 
+            self_url = zenodo_record[item]['links']['self']
+            # Delete the deposit
+            r3 = requests.delete(self_url,headers=headers)
+            if r3.status_code == 204:
+                yield f"\n Deleted {item} deposit successfully at {self_url}."
+                yield ""
+            elif r3.status_code == 403: 
+                yield f"\n The {item} archive has already been published, cannot be deleted."
+                yield ""
+            elif r3.status_code == 410:
+                yield f"\n The {item} deposit does not exist."
+                yield ""
+
+    return flask.Response(run(), mimetype='text/plain')
 
 @app.route('/api/v1/resources/data/sync', methods=['POST'])
 @htpasswd.required
@@ -688,6 +732,3 @@ def previous_request_failed(e):
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=29876)
-
-
-
