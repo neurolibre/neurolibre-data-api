@@ -516,11 +516,13 @@ def api_zenodo_flush_post(user):
                 if tmp_record:
                     for f in tmp_record:
                         os.remove(f)
+                        yield f"\n Deleted {f} record from the server."
                 # Flush ALL the uploaded files associated with the item
                 tmp_file = glob.glob(os.path.join(get_archive_dir(issue_id),f"{dat2recmap[item]}_10.55458_NeuroLibre_{'%05d'%issue_id}_*.zip"))
                 if tmp_file:
                     for f in tmp_file:
                         os.remove(f)
+                        yield f"\n Deleted {f} record from the server."
             elif r3.status_code == 403: 
                 yield f"\n The {item} archive has already been published, cannot be deleted."
                 yield ""
@@ -530,10 +532,14 @@ def api_zenodo_flush_post(user):
         # Write zenodo record json file or rm existing one if empty at this point
         # Delete the old one
         os.remove(local_file)
+        yield f"\n Deleted old {local_file} record from the server."
         # Write the new one
         if zenodo_record:
             with open(local_file, 'w') as outfile:
                 json.dump(zenodo_record, outfile)
+            yield f"\n Created new {local_file}."
+        else:
+            yield f"\n All the deposit records have been deleted."
 
     return flask.Response(run(), mimetype='text/plain')
 
