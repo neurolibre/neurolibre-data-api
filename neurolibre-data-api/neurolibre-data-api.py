@@ -543,6 +543,56 @@ def api_zenodo_flush_post(user):
 
     return flask.Response(run(), mimetype='text/plain')
 
+# ---------------------------- LIST ZENODO RESOURCES ON PROD
+@app.route('/api/v1/resources/zenodo/publish', methods=['POST'])
+@htpasswd.required
+def api_zenodo_publish(user):
+    user_request = flask.request.get_json(force=True)
+    if "issue_id" in user_request:
+        issue_id = user_request["issue_id"]
+    else:
+        flask.abort(400)
+    def run():
+        ZENODO_TOKEN = os.getenv('ZENODO_API')
+        params = {'access_token': ZENODO_TOKEN}
+        # Read json record of the deposit
+        fname = f"zenodo_deposit_NeuroLibre_{'%05d'%issue_id}.json"
+        local_file = os.path.join(get_deposit_dir(issue_id), fname)
+        dat2recmap = {"data":"Dataset","repository":"GitHub repository","docker":"Docker image","book":"Jupyter Book"}
+        with open(local_file, 'r') as f:
+            zenodo_record = json.load(f)
+        if not os.path.exists(local_file):
+            yield "<br> :neutral_face: I could not find any Zenodo-related records on NeuroLibre servers. Maybe start with <code>roboneuro zenodo deposit</code>?"
+        else:
+            # If there's a record, make sure that uploads are complete for all kind of items found in the deposit records.
+            bool_array = []
+            for item in zenodo_record.keys():
+                tmp = glob.glob(os.path.join(get_deposit_dir(issue_id),f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_*.json"))
+                if tmp:
+                    bool_array.append(True)
+                else:
+                    bool_array.append(False)
+            
+            if all(bool_array):
+                # We need self links from each record to publish.
+                for item in zenodo_record.keys():
+                    publish_link = zenodo_record[item]['links']['publish']
+                    yield f"\n :ice_cube: {dat2recmap[item]} publish status:"
+                    r = requests.post(publish_link,params=params)
+                    response = r.json()
+                    if r.status_code==202: 
+                        yield f"\n :confetti_ball: <a href=\"{response['doi_url']}\"><img src=\"{response['links']['badge']}\"></a>"
+                        tmp = f"zenodo_published_{item}_NeuroLibre_{'%05d'%issue_id}.json"
+                        log_file = os.path.join(get_deposit_dir(issue_id), tmp)
+                        with open(log_file, 'w') as outfile:
+                            json.dump(r.json(), outfile)
+                    else:
+                        yield f"\n <details><summary> :wilted_flower: Could not publish {dat2recmap[item]} </summary><pre><code>{r.json()}</code></pre></details>"
+            else:
+                yield "\n :neutral_face: Not all archives are uploaded for the resources listed in the deposit record. Please ask <code>roboneuro zenodo status</code> and upload the missing (xxx) archives by <code>roboneuro zenodo archive-xxx</code>."
+
+    return flask.Response(run(), mimetype='text/plain')
+
 @app.route('/api/v1/resources/data/sync', methods=['POST'])
 @htpasswd.required
 def api_data_sync_post(user):
