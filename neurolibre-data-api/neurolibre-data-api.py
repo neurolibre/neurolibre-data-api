@@ -75,7 +75,7 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
     data["metadata"]["creators"] = creators
     data["metadata"]["keywords"] = ["canadian-open-neuroscience-platform","neurolibre"]
     # (A) NeuroLibre artifact is a part of (isPartOf) the NeuroLibre preprint (B 10.55458/NeuroLibre.issue_id)
-    data["metadata"]["related_identifiers"] = [{"relation": "isPartOf","identifier": f"10.55458/NeuroLibre.{'%05d'%issue_id}","resource_type": "publication-preprint"}]
+    data["metadata"]["related_identifiers"] = [{"relation": "isPartOf","identifier": f"10.55458/neurolibre.{'%05d'%issue_id}","resource_type": "publication-preprint"}]
     data["metadata"]["contributors"] = [{'name':'NeuroLibre, Admin', 'affiliation': 'NeuroLibre', 'type': 'ContactPerson' }]
 
     if (archive_type == 'book'):
