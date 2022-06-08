@@ -90,7 +90,7 @@ def zenodo_create_bucket(title, archive_type, creators, user_url, fork_url, comm
         data["metadata"]["description"] = 'GitHub archive of the ' + libre_text + ', based on the ' + user_text + '.' + review_text + sign_text
     elif (archive_type == 'docker'):
         data["metadata"]["upload_type"] = 'software'
-        data["metadata"]["description"] = 'Docker image built from the ' + libre_text + ', based on the ' + user_text + f", using repo2docker (through BinderHub). <br> To run locally: <ol> <li><pre><code class=\"language-bash\">docker load < DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:5]}.zip</code><pre></li><li><pre><code class=\"language-bash\">docker run -it --rm -p 8888:8888 DOCKER_IMAGE_ID jupyter lab --ip 0.0.0.0</code></pre> <strong>by replacing <code>DOCKER_IMAGE_ID</code> above with the respective ID of the Docker image loaded from the zip file.</strong></li></ol>" + review_text + sign_text
+        data["metadata"]["description"] = 'Docker image built from the ' + libre_text + ', based on the ' + user_text + f", using repo2docker (through BinderHub). <br> To run locally: <ol> <li><pre><code class=\"language-bash\">docker load < DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip</code><pre></li><li><pre><code class=\"language-bash\">docker run -it --rm -p 8888:8888 DOCKER_IMAGE_ID jupyter lab --ip 0.0.0.0</code></pre> <strong>by replacing <code>DOCKER_IMAGE_ID</code> above with the respective ID of the Docker image loaded from the zip file.</strong></li></ol>" + review_text + sign_text
 
     # Make an empty deposit to create the bucket 
     r = requests.post('https://zenodo.org/api/deposit/depositions',
