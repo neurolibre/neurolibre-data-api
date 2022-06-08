@@ -333,20 +333,17 @@ def api_upload_post(user):
 
         elif item == "docker":
 
-            docker_login()
-            # Docker image address should be here
-            docker_pull(item_arg)
+            # If already exists, do not pull again, but let them know.
+            expect = os.path.join(get_archive_dir(issue_id),f"DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.tar.gz")
+            check_docker = os.path.exists(expect)
 
-            in_r = docker_export(item_arg,issue_id,commit_fork)
-            # in_r[0] os.system status, in_r[1] saved docker image absolute path
-
-            docker_logout()
-            if in_r[0] == 0:
-                # Means that saved successfully, upload to zenodo.
-                with open(in_r[1], "rb") as fp:
-                    r = requests.put(f"{bucket_url}/DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
-                                    params=params,
-                                    data=fp)
+            if check_docker:
+                yield f"\n already exists {expect}"
+                yield f"\n uploading to zenodo"
+                with open(expect, "rb") as fp:
+                        r = requests.put(f"{bucket_url}/DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
+                                        params=params,
+                                        data=fp)
                 # TO_DO: Write a function to handle this, too many repetitions rn.
                 if not r:
                     error = {"reason":f"404: Cannot upload {in_r[1]} to {bucket_url}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
@@ -361,10 +358,37 @@ def api_upload_post(user):
                     yield "\n" + json.dumps(r.json())
                     yield ""
             else:
-            # Cannot save docker image succesfully
-                error = {"reason":f"404: Cannot save requested docker image as tar.gz: {item_arg}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
-                yield "\n" + json.dumps(error)
-                yield ""
+                docker_login()
+                # Docker image address should be here
+                docker_pull(item_arg)
+                in_r = docker_export(item_arg,issue_id,commit_fork)
+                # in_r[0] os.system status, in_r[1] saved docker image absolute path
+
+                docker_logout()
+                if in_r[0] == 0:
+                    # Means that saved successfully, upload to zenodo.
+                    with open(in_r[1], "rb") as fp:
+                        r = requests.put(f"{bucket_url}/DockerImage_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
+                                        params=params,
+                                        data=fp)
+                    # TO_DO: Write a function to handle this, too many repetitions rn.
+                    if not r:
+                        error = {"reason":f"404: Cannot upload {in_r[1]} to {bucket_url}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+                        yield "\n" + json.dumps(error)
+                        yield ""
+                    else:
+                        tmp = f"zenodo_uploaded_{item}_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.json"
+                        log_file = os.path.join(get_deposit_dir(issue_id), tmp)
+                        with open(log_file, 'w') as outfile:
+                                json.dump(r.json(), outfile)
+
+                        yield "\n" + json.dumps(r.json())
+                        yield ""
+                else:
+                # Cannot save docker image succesfully
+                    error = {"reason":f"404: Cannot save requested docker image as tar.gz: {item_arg}", "commit_hash":commit_fork, "repo_url":fork_repo,"issue_id":issue_id}
+                    yield "\n" + json.dumps(error)
+                    yield ""
 
         elif item == "repository":
             
@@ -423,16 +447,25 @@ def api_upload_post(user):
                         yield ""
 
         elif item == "data":
-           # We will archive the data synced from the test server. (item_arg is the project_name, indicating that the 
-           # data is stored at the /DATA/project_name folder)
-           local_path = os.path.join("/DATA", item_arg)
-           # Descriptive file name
-           zenodo_file = os.path.join(get_archive_dir(issue_id),f"Dataset_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}")
-           # Zip it!
-           shutil.make_archive(zenodo_file, 'zip', local_path)
-           zpath = zenodo_file + ".zip"
 
-           # UPLOAD data to zenodo        
+           expect = os.path.join(get_archive_dir(issue_id),f"Dataset_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip")
+           check_data = os.path.exists(expect)
+
+           if check_data:
+            yield f"\n Compressed data already exists Dataset_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip"
+            zpath = expect
+           else:
+            # We will archive the data synced from the test server. (item_arg is the project_name, indicating that the 
+            # data is stored at the /DATA/project_name folder)
+            local_path = os.path.join("/DATA", item_arg)
+            # Descriptive file name
+            zenodo_file = os.path.join(get_archive_dir(issue_id),f"Dataset_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}")
+            # Zip it!
+            shutil.make_archive(zenodo_file, 'zip', local_path)
+            zpath = zenodo_file + ".zip"
+
+           # UPLOAD data to zenodo
+           yield f"\n Attempting zenodo upload."
            with open(zpath, "rb") as fp:
             r = requests.put(f"{bucket_url}/Dataset_10.55458_NeuroLibre_{'%05d'%issue_id}_{commit_fork[0:6]}.zip",
                                     params=params,
